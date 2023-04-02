@@ -8,41 +8,63 @@ var app = builder.Build(); // Creates a WebApplication
 
 var todoItems = app.MapGroup("/todoitems");
 
-todoItems.MapGet("/", async (TodoDb db) => 
-    await db.Todos.ToListAsync()); // Adds a route to the app
+todoItems.MapGet("/", GetAllTodos); // Adds a route to the app
 
-todoItems.MapGet("/complete", async (TodoDb db) =>
-    await db.Todos.Where(t => t.IsComplete).ToListAsync()); // Adds a route to the app
+todoItems.MapGet("/complete", GetCompleteTodos); // Adds a route to the app
 
-todoItems.MapGet("/{id}", async (int id, TodoDb db) =>
-    await db.Todos.FindAsync(id) 
-        is Todo todo 
-            ? Results.Ok(todo) 
-            : Results.NotFound()); // Adds a route to the app
+todoItems.MapGet("/{id}", GetTodo); // Adds a route to the app
 
-todoItems.MapPost("/", async (Todo todo, TodoDb db) =>
+todoItems.MapPost("/", CreateTodo); // Adds a route to the app
+
+todoItems.MapPut("/{id}", UpdateTodo);
+
+todoItems.MapDelete("/{id}", DeleteTodo);
+
+// GET / - returns hello world
+app.MapGet("/", () => "Hello World!");
+
+app.Run();
+
+static async Task<IResult> GetAllTodos(TodoDb db)
+{
+    return TypedResults.Ok(await db.Todos.ToListAsync());
+}
+
+static async Task<IResult> GetCompleteTodos(TodoDb db)
+{
+    return TypedResults.Ok(await db.Todos.Where(t => t.IsComplete).ToListAsync());
+}
+
+static async Task<IResult> GetTodo(int id, TodoDb db)
+{
+    return await db.Todos.FindAsync(id) is Todo todo
+        ? TypedResults.Ok(todo)
+        : TypedResults.NotFound();
+}
+
+static async Task<IResult> CreateTodo(Todo todo, TodoDb db)
 {
     db.Todos.Add(todo);
     await db.SaveChangesAsync();
-    
+
     return Results.Created($"/todoitems/{todo.Id}", todo);
-}); // Adds a route to the app
+}
 
-todoItems.MapPut("/{id}", async (int id, Todo inputTodo, TodoDb db) =>
+static async Task<IResult> UpdateTodo(int id, Todo todo, TodoDb db)
 {
-    var todo = await db.Todos.FindAsync(id);
+    var existingTodo = await db.Todos.FindAsync(id);
 
-    if (todo is null) return Results.NotFound();
+    if (existingTodo is null) return Results.NotFound();
 
-    todo.Name = inputTodo.Name;
-    todo.IsComplete = inputTodo.IsComplete;
+    existingTodo.Name = todo.Name;
+    existingTodo.IsComplete = todo.IsComplete;
 
     await db.SaveChangesAsync();
 
     return Results.NoContent();
-});
+}
 
-todoItems.MapDelete("/{id}", async (int id, TodoDb db) =>
+static async Task<IResult> DeleteTodo(int id, TodoDb db)
 {
     if (await db.Todos.FindAsync(id) is Todo todo)
     {
@@ -52,9 +74,4 @@ todoItems.MapDelete("/{id}", async (int id, TodoDb db) =>
     }
 
     return Results.NoContent();
-});
-
-// GET / - returns hello world
-app.MapGet("/", () => "Hello World!");
-
-app.Run();
+}
